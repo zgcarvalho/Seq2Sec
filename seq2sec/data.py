@@ -119,11 +119,14 @@ class SSDataset(Dataset):
 # getitem -> read files and concatenate
 
 if __name__ == "__main__":
+    import time
+    t0 = time.process_time()
     d = SSDataset('../data/config/data_cath95.json')
     print(d.path)
     print(d.tasks)
     print(len(d.examples))
     for i in range(len(d.examples)):
         a = d[i]
+    print("Time elapsed: ", time.process_time() - t0)
         # print(i)
         # print(a[0].shape, a[1].shape)
