@@ -1,7 +1,8 @@
 {
     "path":"/home/jgcarvalho/local_data/cnnss/processed_data/",
-    "label":["ss_cons_4_label"],
+    "label":["ss_cons_3_label", "ss_cons_4_label"],
     "training":[
+        {"id":"1a02","chain":"N"},
         {"id":"16pk","chain":"A"},
         {"id":"1a2p","chain":"B"},
         {"id":"1a34","chain":"A"},

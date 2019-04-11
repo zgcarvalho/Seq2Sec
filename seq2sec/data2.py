@@ -116,21 +116,21 @@ class SSDataset(Dataset):
 
         return examples
 
-    def _encode_aa(self, seq):
-        code = torch.zeros((INPUT_CODE, MAX_LENGTH+(2*PAD)), requires_grad=False)
+    # def _encode_aa(self, seq):
+    #     code = torch.zeros((INPUT_CODE, MAX_LENGTH+(2*PAD)), requires_grad=False)
 
-        for i in range(PAD):
-            code[AA['before'].value, i] = 1
+    #     for i in range(PAD):
+    #         code[AA['before'].value, i] = 1
 
-        for i, aa in enumerate(seq):
-            code[AA[aa].value, i+PAD] = 1
+    #     for i, aa in enumerate(seq):
+    #         code[AA[aa].value, i+PAD] = 1
         
-        for i in range(PAD+len(seq), (2*PAD)+len(seq)):
-            code[AA['after'].value, i] = 1
+    #     for i in range(PAD+len(seq), (2*PAD)+len(seq)):
+    #         code[AA['after'].value, i] = 1
 
-        # after (pad)+len(seq)+(pad) the values are zero
+    #     # after (pad)+len(seq)+(pad) the values are zero
 
-        return code
+    #     return code
 
     def _seq2int(self, seq):
         code = np.zeros(len(seq), dtype=np.int)

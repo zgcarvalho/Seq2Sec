@@ -3,7 +3,7 @@
         "ss_cons_3_label",
         "asaI_label"
     ],
-    "path": "/home/jgcarvalho/local_data/cnnss/processed_data/",
+    "path": "/home/jgcarvalho/local_data/cnnss/processed_data_bck/",
     "testing": [
         {
             "chain": "A",
