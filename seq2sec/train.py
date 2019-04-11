@@ -3,6 +3,62 @@ import torch
 from seq2sec import data
 from seq2sec import model
 
+def train_new(data_config_file, fn_to_save_model=""):
+    # test data
+    # x = torch.randn(64,22,100)
+    # y = torch.randint(-1,3,(64,100), dtype=torch.long)
+
+    # datasets
+    trainset = data.SSDataset(data_config_file, use='training')
+    valset = data.SSDataset(data_config_file, use='validation')
+
+    # dataloaders
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False)
+
+    # model
+    # net = model.ResNet(21, chan_out=4, chan_hidden=24)
+    # net = netmodel
+    net = create_model(trainset.tasks)
+
+    # loss
+    loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='elementwise_mean')
+
+    # optimizer
+    lr = 0.003
+    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+
+    # epochs
+    for t in range(10):
+        for i, (x, y) in enumerate(trainloader):
+            # Forward pass: compute predicted y by passing x to the model.
+            y_pred = net(x)
+
+            # Compute and print loss.
+            loss = loss_fn(y_pred, y)
+            print(t, i, loss.item())
+
+            # backprop
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+    if fn_to_save_model != "":
+        torch.save(net, fn_to_save_model)
+
+def create_model(tasks):
+    if len(tasks) == 1:
+        if tasks[0] == 'ss_cons_3_label':
+            return model.ResNet(21, chan_out=3, chan_hidden=24)
+        elif tasks[0] == 'ss_cons_4_label':
+            return model.ResNet(21, chan_out=4, chan_hidden=24)
+        elif tasks[0] == 'ss_cons_8_label':
+            return model.ResNet(21, chan_out=8, chan_hidden=24)
+        else: 
+            print("ResNet not defined for this tasks {}. Please, edit the code or change task")
+    elif len(tasks) > 1:
+        
+        
 def train(netmodel, data_config_file, fn_to_save_model=""):
     # test data
     # x = torch.randn(64,22,100)

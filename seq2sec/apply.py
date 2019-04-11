@@ -16,7 +16,8 @@ class Protein(object):
         
 
     def predict_with(self, model_func):
-        y_pred = model_func(self._encode_aa(self.seq))
+        # y_pred = model_func(self._encode_aa(self.seq))
+        y_pred = model_func(self._pad_input(self._seq2int(self.seq)))
         # remove sequence padding
         self.probabilities = np.transpose(np.squeeze(y_pred)[:,:,PAD:-PAD][-1,:,:])
         self.prediction = self._prob2ss()
@@ -58,21 +59,17 @@ class Protein(object):
                 return False
         return True
 
-    def _encode_aa(self, seq):
-        code = torch.zeros((1, INPUT_CODE, len(seq)+(2*PAD)), requires_grad=False)
-
-        for i in range(PAD):
-            code[0, AA['before'].value, i] = 1
-
+    def _seq2int(self, seq):
+        code = np.zeros(len(seq), dtype=np.int)
         for i, aa in enumerate(seq):
-            code[0, AA[aa].value, i+PAD] = 1
-        
-        for i in range(PAD+len(seq), (2*PAD)+len(seq)):
-            code[0, AA['after'].value, i] = 1
-
-        # after (pad)+len(seq)+(pad) the values are zero
-
+            code[i] = AA[aa].value
         return code
+
+    def _pad_input(self, x):
+        idx = np.pad(x, (PAD,PAD), 'constant', constant_values=(AA['before'].value, AA['after'].value))
+        m = torch.zeros((1, INPUT_CODE, len(x)+(2*PAD)), requires_grad=False)
+        m[0, idx, np.arange(len(x)+(2*PAD))] = 1
+        return m
 
     def iplot_probabilities(self):
         import plotly.graph_objs as go
