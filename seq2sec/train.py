@@ -2,8 +2,28 @@
 import torch
 from seq2sec import data
 from seq2sec import model
+from visdom import Visdom
+import numpy as np
+
+DEFAULT_PORT = 8097
+DEFAULT_HOSTNAME = "http://localhost"
+# parser = argparse.ArgumentParser(description='Demo arguments')
+# parser.add_argument('-port', metavar='port', type=int, default=DEFAULT_PORT,
+#                     help='port the visdom server is running on.')
+# parser.add_argument('-server', metavar='server', type=str,
+#                     default=DEFAULT_HOSTNAME,
+#                     help='Server address of the target to run the demo on.')
+# FLAGS = parser.parse_args()
 
 def train(data_config_file, fn_to_save_model=""):
+    viz = Visdom(port=DEFAULT_PORT, server=DEFAULT_HOSTNAME)
+
+    # # visdom example of text and update (to be removed later)
+    # textwindow = viz.text('Hello World!')
+    # updatetextwindow = viz.text('Hello World! More text should be here')
+    # assert updatetextwindow is not None, 'Window was none'
+    # viz.text('And here it is', win=updatetextwindow, append=True)
+
     # test data
     # x = torch.randn(64,22,100)
     # y = torch.randint(-1,3,(64,100), dtype=torch.long)
@@ -30,7 +50,10 @@ def train(data_config_file, fn_to_save_model=""):
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
     # epochs
+
     for e in range(10):
+        to_plot = []
+
         for i, sample in enumerate(trainloader):
             # Forward pass: compute predicted y by passing x to the model.
             # print(sample['seq_res'])
@@ -49,6 +72,17 @@ def train(data_config_file, fn_to_save_model=""):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
+
+            to_plot.append(loss.item())
+            
+
+
+        l = len(to_plot)
+        if e == 0:
+            win_loss = viz.line(X=np.arange(0,l), Y=np.array(to_plot))
+        else:
+            viz.line(X=np.arange(e*l,e*l+l), Y=np.array(to_plot), win=win_loss, update='append')
+        #     c+=1
 
     if fn_to_save_model != "":
         torch.save(net, fn_to_save_model)
