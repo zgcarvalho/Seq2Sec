@@ -10,39 +10,40 @@ class Protein(object):
         assert(self._is_ok(s))
         self.seq = s 
         # self.one_hot = self._encode_aa(s) 
-        self.prediction = None
-        self.probabilities = None
-        self.steps = None
+        self.prediction = {}
+        self.probabilities = {}
+        self.steps = {}
         
-
     def predict_with(self, model_func):
         # y_pred = model_func(self._encode_aa(self.seq))
-        y_pred = model_func(self._pad_input(self._seq2int(self.seq)))
-        # remove sequence padding
-        self.probabilities = np.transpose(np.squeeze(y_pred)[:,:,PAD:-PAD][-1,:,:])
-        self.prediction = self._prob2ss()
-        # transpose axis to create C matrix LxD where C is the number of classes, L is the length 
-        # of the protein sequence and D is depth of the resnet (number of blocks)
-        self.steps = np.transpose(np.squeeze(y_pred)[:,:,PAD:-PAD], axes=[1,2,0])
+        pred = model_func(self._pad_input(self._seq2int(self.seq)))
+        self.probabilities = {k:np.transpose(np.squeeze(pred[k])[:,:,PAD:-PAD][-1,:,:]) for k in pred}
+        # # remove sequence padding
+        self.prediction = {k: self._prob2ss(self.probabilities[k]) for k in self.probabilities}
+        # # transpose axis to create C matrix LxD where C is the number of classes, L is the length 
+        # # of the protein sequence and D is depth of the resnet (number of blocks)
+        self.steps = {k: np.transpose(np.squeeze(pred[k])[:,:,PAD:-PAD], axes=[1,2,0]) for k in pred}
 
     def plot_probs(self):
         pass
 
     def plot_steps(self):
         pass
-        
-    def _prob2ss(self):
+
+    @staticmethod 
+    def _prob2ss(prob):
         # number of classes (types of secondary structure)
-        n_c = self.probabilities.shape[1]
+        n_c = prob.shape[1]
         c = ['H', 'E', 'C']
         if n_c == 4:
             c = ['H', 'E', 'C', 'T']
         elif n_c == 8: 
             c = ['H', 'G', 'I', 'E', 'C', 'T', 'B', 'S']
-        idx = self.probabilities.argmax(axis=1)
+        idx = prob.argmax(axis=1)
         return ''.join([c[i] for i in idx])
 
-    def _read_fasta_file(self,fn):
+    @staticmethod
+    def _read_fasta_file(fn):
         with open(fn, 'r') as f:
             seq = ""
             for l in f.readlines():
@@ -52,24 +53,34 @@ class Protein(object):
                     seq += l.strip()
         return seq.upper()
 
-    def _is_ok(self,sequence):
+    @staticmethod 
+    def _is_ok(sequence):
         for i in sequence:
             if not i in AA.__members__:
                 print("Error: {} is not a valid aminoacid code")
                 return False
         return True
 
-    def _seq2int(self, seq):
+    @staticmethod
+    def _seq2int(seq):
         code = np.zeros(len(seq), dtype=np.int)
         for i, aa in enumerate(seq):
             code[i] = AA[aa].value
         return code
 
-    def _pad_input(self, x):
+    @staticmethod
+    def _pad_input(x):
         idx = np.pad(x, (PAD,PAD), 'constant', constant_values=(AA['before'].value, AA['after'].value))
         m = torch.zeros((1, INPUT_CODE, len(x)+(2*PAD)), requires_grad=False)
         m[0, idx, np.arange(len(x)+(2*PAD))] = 1
         return m
+
+    def plot_probs(self):
+        pass
+
+    def plot_steps(self):
+        pass
+
 
     def iplot_probabilities(self):
         import plotly.graph_objs as go
