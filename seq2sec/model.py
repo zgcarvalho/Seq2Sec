@@ -133,14 +133,15 @@ class ResNet2(nn.Module):
         output = {k: self.exit_layers[k](x) for k in self.exit_layers}
         return output
 
-    # def predict(self, x):
-    #     '''returns a list of lists. The inner list contains the prediction at each resnet block. The
-    #     outer list separates the results per tasks'''
-    #     x = self.feat(x)
-    #     #TODO this comprehension can be optimized. Same blocks are executed n=len(exit_layers) times.
-    #     #TODO include a softmax and change to np.array as done in ResNet.predict
-    #     results = [[ exitlayer(block(x)) for block in self.block_layers ] for exitlayer in self.exit_layers ]
-    #     return results
+    def predict(self, x):
+        '''returns a list of lists. The inner list contains the prediction at each resnet block. The
+        outer list separates the results per tasks'''
+        x = self.feat(x)
+        #TODO this comprehension can be optimized. Same blocks are executed n=len(exit_layers) times.
+        #TODO include a softmax and change to np.array as done in ResNet.predict
+        results = {k:[nn.functional.softmax(self.exit_layers[k](block(x)), dim=1).detach().numpy() for block in self.block_layers ] for k in self.exit_layers }
+        return results
+
 
 def load(filename):
     net = torch.load(filename) 
