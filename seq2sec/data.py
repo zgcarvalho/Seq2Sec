@@ -53,7 +53,8 @@ PAD = 50
 INPUT_CODE = 22
 
 class SSDataset(Dataset):
-    '''single task'''
+    '''SSDataset contain the data to train the Seq2Sec network.
+    '''
     def __init__(self, json_config, context='training'):
         with open(json_config, 'r') as f:
             config = json.load(f)
