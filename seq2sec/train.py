@@ -51,9 +51,13 @@ def train(data_config_file, fn_to_save_model=""):
 
     # epochs
 
+    training_losses = []
+    validation_losses = []
     for e in range(10):
-        to_plot = []
-
+    
+        # training loop
+        batch_of_losses = []
+        net.train()
         for i, sample in enumerate(trainloader):
             # Forward pass: compute predicted y by passing x to the model.
             # print(sample['seq_res'])
@@ -66,23 +70,47 @@ def train(data_config_file, fn_to_save_model=""):
 
             # loss = loss_fn(y_pred, y)
             loss = sum(losses)
-            print(e, i, loss.item())
+            # print(e, i, loss.item()) # print loss every batch (debug)
 
             # backprop
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-            to_plot.append(loss.item())
-            
+            batch_of_losses.append(loss.item())
+        
+        training_losses.append(np.mean(batch_of_losses))
+        
+        
+        # validation loop
+        batch_of_losses = []
+        net.eval()
+        for i, sample in enumerate(valloader):
+            # Forward pass: compute predicted y by passing x to the model.
+            # print(sample['seq_res'])
+            pred = net(sample['seq_res'])
 
+            # Compute and print loss.
+            losses = []
+            for t in tasks:
+                losses.append(loss_fn(pred[t], sample[t]))
 
-        l = len(to_plot)
+            # loss = loss_fn(y_pred, y)
+            loss = sum(losses)
+            # print(e, i, loss.item()) # print loss every batch_of_losses = []
+
+            batch_of_losses.append(loss.item())
+        
+        validation_losses.append(np.mean(batch_of_losses))batch_of_losses = []
+
+        
+        l = len(training_losses)
         if e == 0:
             win_loss = viz.line(X=np.arange(0,l), Y=np.array(to_plot))
         else:
             viz.line(X=np.arange(e*l,e*l+l), Y=np.array(to_plot), win=win_loss, update='append')
         #     c+=1
+
 
     if fn_to_save_model != "":
         torch.save(net, fn_to_save_model)
