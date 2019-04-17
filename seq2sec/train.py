@@ -4,6 +4,7 @@ from seq2sec import data
 from seq2sec import model
 from visdom import Visdom
 import numpy as np
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 
 DEFAULT_PORT = 8097
 DEFAULT_HOSTNAME = "http://localhost"
@@ -49,14 +50,28 @@ def train(data_config_file, fn_to_save_model=""):
     lr = 0.003
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
-    # epochs
+    
+    # training and validations losses, total and per tasks
+    training_losses = {k:[] for k in tasks}
+    training_losses['total'] = []
+    validation_losses = {k:[] for k in tasks}
+    validation_losses['total'] = []
 
-    training_losses = []
-    validation_losses = []
+    # metrics
+    validation_acc = {k:[] for k in tasks}
+    # validation_acc['total'] = []
+    validation_balanced_acc = {k:[] for k in tasks}
+    # validation_balanced_acc['total'] = []
+    validation_cm = {k:[] for k in tasks}
+    # validation_cm['total'] = []
+
+    # epochs
     for e in range(10):
     
+        # restart dictionary that accumulates losses per batch
+        batch_of_losses = {k:[] for k in training_losses}
+
         # training loop
-        batch_of_losses = []
         net.train()
         for i, sample in enumerate(trainloader):
             # Forward pass: compute predicted y by passing x to the model.
@@ -66,7 +81,9 @@ def train(data_config_file, fn_to_save_model=""):
             # Compute and print loss.
             losses = []
             for t in tasks:
-                losses.append(loss_fn(pred[t], sample[t]))
+                l = loss_fn(pred[t], sample[t])
+                batch_of_losses[t].append(l.item())
+                losses.append(l)
 
             # loss = loss_fn(y_pred, y)
             loss = sum(losses)
@@ -77,13 +94,19 @@ def train(data_config_file, fn_to_save_model=""):
             loss.backward()
             optimizer.step()
 
-            batch_of_losses.append(loss.item())
+            batch_of_losses['total'].append(loss.item())
         
-        training_losses.append(np.mean(batch_of_losses))
+        for k in training_losses:
+            training_losses[k].append(np.mean(batch_of_losses[k]))
         
         
+        # restart dictionary that accumulates losses per batch
+        batch_of_losses = {k:[] for k in validation_losses}
+        batch_of_acc = {k:[] for k in validation_losses}
+        batch_of_balanced_acc = {k:[] for k in validation_losses}
+        batch_of_cm = {k:[] for k in validation_losses}
+
         # validation loop
-        batch_of_losses = []
         net.eval()
         for i, sample in enumerate(valloader):
             # Forward pass: compute predicted y by passing x to the model.
@@ -93,23 +116,58 @@ def train(data_config_file, fn_to_save_model=""):
             # Compute and print loss.
             losses = []
             for t in tasks:
+                l = loss_fn(pred[t], sample[t])
+                batch_of_losses[t].append(l.item())
                 losses.append(loss_fn(pred[t], sample[t]))
+
+                mask = sample[t].ge(0)
+                y_true = torch.masked_select(sample[t], mask).numpy()
+                y_pred = torch.masked_select(pred[t].argmax(dim=1), mask).numpy()
+
+                acc = accuracy_score(y_true, y_pred)
+                batch_of_acc[t].append(acc)
+
+                bacc = balanced_accuracy_score(y_true, y_pred)
+                batch_of_balanced_acc[t].append(bacc)
+                # print("epoch: {} batch: {} task: {} acc: {} b_acc: {}".format(e, i, t, acc, bacc))
+                cm = confusion_matrix(y_true,y_pred)
+                batch_of_cm[t].append(cm)
+                # print(cm)
 
             # loss = loss_fn(y_pred, y)
             loss = sum(losses)
             # print(e, i, loss.item()) # print loss every batch_of_losses = []
 
-            batch_of_losses.append(loss.item())
+            batch_of_losses['total'].append(loss.item())
         
-        validation_losses.append(np.mean(batch_of_losses))batch_of_losses = []
+        for k in validation_losses:
+            validation_losses[k].append(np.mean(batch_of_losses[k]))
+
+        print("epoch: {} training_loss: {} validation_loss: {}".format(e, training_losses['total'][-1], validation_losses['total'][-1]))
+
+        for t in tasks:
+            validation_acc[t].append(np.mean(batch_of_acc[t]))
+            validation_balanced_acc[t].append(np.mean(batch_of_balanced_acc[t]))
+            print("-> task: {} acc: {} balanced_acc: {}".format(t, validation_acc[t][-1], validation_balanced_acc[t][-1]))
+
 
         
-        l = len(training_losses)
-        if e == 0:
-            win_loss = viz.line(X=np.arange(0,l), Y=np.array(to_plot))
-        else:
-            viz.line(X=np.arange(e*l,e*l+l), Y=np.array(to_plot), win=win_loss, update='append')
-        #     c+=1
+        
+
+
+        
+
+        # if e == 0:
+        #     win_loss = viz.line(X=np.arange(0,len(training_losses)), Y=np.array(training_losses))
+        # else: 
+        #     viz.line(X=np.arange(0,len(training_losses)), Y=np.array(training_losses), win=win_loss, update='replace')
+
+        # l = len(training_losses)
+        # if e == 0:
+        #     win_loss = viz.line(X=np.arange(0,l), Y=np.array(to_plot))
+        # else:
+        #     viz.line(X=np.arange(e*l,e*l+l), Y=np.array(to_plot), win=win_loss, update='append')
+        # #     c+=1
 
 
     if fn_to_save_model != "":
