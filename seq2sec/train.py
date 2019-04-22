@@ -30,8 +30,13 @@ def train(data_config_file, fn_to_save_model=""):
     trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True)
     valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False)
 
+    # if torch.cuda.is_available():
+    #     device = torch.device('cuda')
+    # else:
+    #     device = torch.device('cpu')
+    device = torch.device('cpu')
     # model
-    net = create_model(tasks)
+    net = create_model(tasks).to(device)
 
     # loss
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
@@ -68,12 +73,12 @@ def train(data_config_file, fn_to_save_model=""):
         for i, sample in enumerate(trainloader):
             # Forward pass: compute predicted y by passing x to the model.
             # print(sample['seq_res'])
-            pred = net(sample['seq_res'])
+            pred = net(sample['seq_res'].to(device))
 
             # Compute and print loss.
             losses = []
             for t in tasks:
-                l = loss_fn(pred[t], sample[t])
+                l = loss_fn(pred[t], sample[t].to(device))
                 batch_of_losses[t].append(l.item())
                 losses.append(l)
 
@@ -103,18 +108,18 @@ def train(data_config_file, fn_to_save_model=""):
         for i, sample in enumerate(valloader):
             # Forward pass: compute predicted y by passing x to the model.
             # print(sample['seq_res'])
-            pred = net(sample['seq_res'])
+            pred = net(sample['seq_res'].to(device))
 
             # Compute and print loss.
             losses = []
             for t in tasks:
-                l = loss_fn(pred[t], sample[t])
+                l = loss_fn(pred[t], sample[t].to(device))
                 batch_of_losses[t].append(l.item())
-                losses.append(loss_fn(pred[t], sample[t]))
+                losses.append(l)
 
                 mask = sample[t].ge(0)
                 y_true = torch.masked_select(sample[t], mask).numpy()
-                y_pred = torch.masked_select(pred[t].argmax(dim=1), mask).numpy()
+                y_pred = torch.masked_select(pred[t].argmax(dim=1), mask).to('cpu').numpy()
 
                 acc = accuracy_score(y_true, y_pred)
                 batch_of_acc[t].append(acc)
