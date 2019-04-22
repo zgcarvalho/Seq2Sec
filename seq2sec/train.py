@@ -5,25 +5,15 @@ from seq2sec import model
 from visdom import Visdom
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
+import nni
 
-DEFAULT_PORT = 8097
-DEFAULT_HOSTNAME = "http://localhost"
-# parser = argparse.ArgumentParser(description='Demo arguments')
-# parser.add_argument('-port', metavar='port', type=int, default=DEFAULT_PORT,
-#                     help='port the visdom server is running on.')
-# parser.add_argument('-server', metavar='server', type=str,
-#                     default=DEFAULT_HOSTNAME,
-#                     help='Server address of the target to run the demo on.')
-# FLAGS = parser.parse_args()
+# DEFAULT_PORT = 8097
+# DEFAULT_HOSTNAME = "http://localhost"
 
+
+# def train(data_config_file, nni_params, fn_to_save_model=""):
 def train(data_config_file, fn_to_save_model=""):
-    viz = Visdom(port=DEFAULT_PORT, server=DEFAULT_HOSTNAME)
-
-    # # visdom example of text and update (to be removed later)
-    # textwindow = viz.text('Hello World!')
-    # updatetextwindow = viz.text('Hello World! More text should be here')
-    # assert updatetextwindow is not None, 'Window was none'
-    # viz.text('And here it is', win=updatetextwindow, append=True)
+    # viz = Visdom(port=DEFAULT_PORT, server=DEFAULT_HOSTNAME)
 
     # test data
     # x = torch.randn(64,22,100)
@@ -47,7 +37,9 @@ def train(data_config_file, fn_to_save_model=""):
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
 
     # optimizer
+    """@nni.variable(nni.loguniform(0.0001, 0.01), name=lr)"""
     lr = 0.003
+    # lr = nni_params["learning_rate"]
     optimizer = torch.optim.Adam(net.parameters(), lr=lr)
 
     
@@ -145,22 +137,27 @@ def train(data_config_file, fn_to_save_model=""):
 
         print("epoch: {} training_loss: {} validation_loss: {}".format(e, training_losses['total'][-1], validation_losses['total'][-1]))
 
+        report = {'default': validation_losses['total'][-1]}
         for t in tasks:
             validation_acc[t].append(np.mean(batch_of_acc[t]))
             validation_balanced_acc[t].append(np.mean(batch_of_balanced_acc[t]))
             print("-> task: {} acc: {} balanced_acc: {}".format(t, validation_acc[t][-1], validation_balanced_acc[t][-1]))
 
+            # report used by nni
+            report["training_losses."+t] = training_losses[t][-1]
+            report["validation_losses."+t] = validation_losses[t][-1]
+            report["validation_acc."+t] = validation_acc[t][-1]
+            report["validation_balance_acc."+t] = validation_balanced_acc[t][-1]
 
+
+        # print(report)
+        """@nni.report_intermediate_result(report)"""
+        # nni.report_intermediate_result(report)
         
+
+        # visdom_plot(training_losses, validation_losses, validation_acc, validation_balanced_acc, validation_cm)
         
 
-
-        
-
-        # if e == 0:
-        #     win_loss = viz.line(X=np.arange(0,len(training_losses)), Y=np.array(training_losses))
-        # else: 
-        #     viz.line(X=np.arange(0,len(training_losses)), Y=np.array(training_losses), win=win_loss, update='replace')
 
         # l = len(training_losses)
         # if e == 0:
@@ -169,7 +166,8 @@ def train(data_config_file, fn_to_save_model=""):
         #     viz.line(X=np.arange(e*l,e*l+l), Y=np.array(to_plot), win=win_loss, update='append')
         # #     c+=1
 
-
+    """@nni.report_final_result(report)"""
+    # nni.report_final_result(report)
     if fn_to_save_model != "":
         torch.save(net, fn_to_save_model)
 
@@ -182,8 +180,23 @@ def create_model(tasks):
             net_output[t] = 4
         elif t == 'ss_cons_8_label':
             net_output[t] = 8
-    
-    return model.ResNet2(net_output)
+
+    """@nni.variable(nni.choice(5,9,13,17,21), name=nb)"""
+    nb = 21
+    """@nni.variable(nni.choice(12,16,20,24,28,32,40), name=ch)"""
+    ch = 24
+    return model.ResNet2(net_output, n_blocks=nb, chan_hidden=ch)
+
+# def visdom_plot(training_losses, validation_losses, validation_acc, validation_balanced_acc, validation_cm):
+#         xlen = np.arange(0,len(training_losses['total']))
+#         xline = np.column_stack((xlen, xlen))
+#         yline = np.column_stack((training_losses['total'], validation_losses['total']))
+#         print(xline.shape, yline.shape)
+#         if e == 0:
+#             win_loss = viz.line(X=xline, Y=yline, opts=dict(legend=['training', 'validation']))
+#         else: 
+#             viz.line(X=xline, Y=yline, win=win_loss, update='replace')
+
 
 
 if __name__ == "__main__":
