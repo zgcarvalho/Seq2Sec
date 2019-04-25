@@ -2,7 +2,7 @@
 import torch
 from seq2sec import data
 from seq2sec import model
-from visdom import Visdom
+# from visdom import Visdom
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 import nni
@@ -27,16 +27,17 @@ def train(data_config_file, fn_to_save_model=""):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=32, shuffle=True, num_workers=6)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=32, shuffle=False, num_workers=6)
 
     # if torch.cuda.is_available():
     #     device = torch.device('cuda')
     # else:
     #     device = torch.device('cpu')
-    device = torch.device('cpu')
+    device = torch.device('cuda')
     # model
-    net = create_model(tasks).to(device)
+    net = create_model(tasks)
+    net = net.to(device)
 
     # loss
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
@@ -62,8 +63,9 @@ def train(data_config_file, fn_to_save_model=""):
     validation_cm = {k:[] for k in tasks}
     # validation_cm['total'] = []
 
+
     # epochs
-    for e in range(10):
+    for e in range(1000):
     
         # restart dictionary that accumulates losses per batch
         batch_of_losses = {k:[] for k in training_losses}
@@ -119,7 +121,7 @@ def train(data_config_file, fn_to_save_model=""):
 
                 mask = sample[t].ge(0)
                 y_true = torch.masked_select(sample[t], mask).numpy()
-                y_pred = torch.masked_select(pred[t].argmax(dim=1), mask).to('cpu').numpy()
+                y_pred = torch.masked_select(pred[t].argmax(dim=1).to(torch.device('cpu')), mask).numpy()
 
                 acc = accuracy_score(y_true, y_pred)
                 batch_of_acc[t].append(acc)

@@ -22,7 +22,7 @@ class BlockLayer(nn.Module):
         self.act_02 = nn.PReLU(chan_in)
         self.conv_02 = nn.Conv1d(chan_in, chan_out, 3, padding=1)
         """@nni.variable(nni.uniform(0.0, 0.9), name=p_drop)"""
-        p_drop = 0.3
+        p_drop = 0.01
         self.dropout = nn.Dropout(p=p_drop)
 
     def forward(self, x):
@@ -55,7 +55,7 @@ class ResNet2(nn.Module):
         self.block_layers = self._make_block_layers(n_blocks, chan_in=
             chan_hidden, chan_out=chan_hidden)
         self.exit_layers = {k: ExitLayer(chan_in=chan_hidden, chan_out=
-            output[k]) for k in output}
+            output[k]).to(torch.device('cuda')) for k in output}
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.xavier_normal_(m.weight.data, gain=nn.init.
