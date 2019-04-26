@@ -17,6 +17,7 @@ class Protein(object):
 
     def predict_with(self, model_func):
         pred = model_func(self._pad_input(self._seq2int(self.seq)))
+        # return pred
         self.probabilities = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD
             :-PAD][(-1), :, :]) for k in pred}
         self.prediction = {k: self._prob2ss(self.probabilities[k]) for k in

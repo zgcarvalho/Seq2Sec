@@ -55,7 +55,7 @@ class ResNet2(nn.Module):
         self.block_layers = self._make_block_layers(n_blocks, chan_in=
             chan_hidden, chan_out=chan_hidden)
         self.exit_layers = {k: ExitLayer(chan_in=chan_hidden, chan_out=
-            output[k]).to(torch.device('cuda')) for k in output}
+            output[k]) for k in output}
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 nn.init.xavier_normal_(m.weight.data, gain=nn.init.
@@ -76,15 +76,26 @@ class ResNet2(nn.Module):
     def predict(self, x):
         """returns a list of lists. The inner list contains the prediction at each resnet block. The
         outer list separates the results per tasks"""
-        x = self.feat(x)
-        results = {k: [nn.functional.softmax(self.exit_layers[k](block(x)),
-            dim=1).detach().numpy() for block in self.block_layers] for k in
+        b_results = [self.feat(x)]
+        # list of results before exit layer. [0] is the result after feat layer. [1] is the result of 
+        # the first block layer applied to [0]. [2] is the result of the second block layer to [1]...
+        for block in self.block_layers:
+            b_results.append(block(b_results[-1]))
+        # applies each exit layer to the steps (b_results) calculated before 
+        results = {k: [nn.functional.softmax(self.exit_layers[k](step),
+            dim=1).detach().numpy() for step in b_results] for k in
             self.exit_layers}
         return results
 
+    def to(self, *args, **kwargs):
+        self = super().to(*args, **kwargs) 
+        self.exit_layers = {k: self.exit_layers[k].to(*args, **kwargs) for k in self.exit_layers} 
+        return self
 
-def load(filename):
+
+def load(filename, device=torch.device('cpu')):
     net = torch.load(filename)
+    net = net.to(device)
     net.eval()
     return net
 
