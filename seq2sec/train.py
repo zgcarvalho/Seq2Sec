@@ -10,9 +10,16 @@ import nni
 # DEFAULT_PORT = 8097
 # DEFAULT_HOSTNAME = "http://localhost"
 
+def loss_mse(input, target):
+    # some positions at label has 'value' NaN. isfinite() creates a mask to remove these positions
+    # to correct loss calculation 
+    mask = torch.isfinite(target)
+    return torch.nn.functional.mse_loss(torch.masked_select(input, mask), torch.masked_select(target, mask), reduction='mean') 
+
 
 # def train(data_config_file, nni_params, fn_to_save_model=""):
-def train(data_config_file, fn_to_save_model=""):
+def train(data_config_file, fn_to_save_model="", device='cpu'):
+    device=torch.device(device)
     # viz = Visdom(port=DEFAULT_PORT, server=DEFAULT_HOSTNAME)
 
     # test data
@@ -34,8 +41,6 @@ def train(data_config_file, fn_to_save_model=""):
     #     device = torch.device('cuda')
     # else:
     #     device = torch.device('cpu')
-    device = torch.device('cuda')
-    # model
     net = create_model(tasks)
     net = net.to(device)
 
