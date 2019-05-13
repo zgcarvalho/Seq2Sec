@@ -16,14 +16,22 @@ class Protein(object):
         self.steps = {}
 
     def predict_with(self, model_func):
+        # convert string to one hot encoding and add padding
         pred = model_func(self._pad_input(self._seq2int(self.seq)))
-        # return pred
-        self.probabilities = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD
-            :-PAD][(-1), :, :]) for k in pred}
-        self.prediction = {k: self._prob2ss(self.probabilities[k]) for k in
-            self.probabilities}
-        self.steps = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD],
-            axes=[1, 2, 0]) for k in pred}
+        for k in pred:
+            if k == 'buriedI_abs':
+                self.prediction[k] = np.squeeze(pred[k][-1][:, :, PAD:-PAD])
+                self.steps[k] = np.transpose(np.squeeze(pred[k])[ :, PAD:-PAD])
+            else:
+                self.probabilities[k] = np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD][(-1), :, :])
+                self.prediction[k] = self._prob2ss(self.probabilities[k])
+                self.steps[k] = np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD], axes=[1, 2, 0])
+        # self.probabilities = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD
+        #     :-PAD][(-1), :, :]) for k in pred}
+        # self.prediction = {k: self._prob2ss(self.probabilities[k]) for k in
+        #     self.probabilities}
+        # self.steps = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD],
+        #     axes=[1, 2, 0]) for k in pred}
 
     def plot_probs(self):
         pass

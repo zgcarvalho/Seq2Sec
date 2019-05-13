@@ -57,6 +57,8 @@ class SSDataset(Dataset):
         for k in self.examples:
             if k == 'seq_res':
                 ex[k] = self._pad_input(self.examples[k][idx])
+            elif k == 'buriedI_abs':
+                ex[k] = self._pad_abs(self.examples[k][idx])
             else:
                 ex[k] = self._pad_label(self.examples[k][idx])
         return ex
@@ -96,6 +98,11 @@ class SSDataset(Dataset):
     def _pad_label(y):
         return torch.from_numpy(np.pad(y, (PAD, MAX_LENGTH + 2 * PAD - len(
             y) - PAD), 'constant', constant_values=(-1, -1))).type(torch.int64)
+
+    @staticmethod
+    def _pad_abs(y):
+        return torch.from_numpy(np.pad(y, (PAD, MAX_LENGTH + 2 * PAD - len(
+            y) - PAD), 'constant', constant_values=(np.nan, np.nan))).type(torch.float)
 
 
 if __name__ == '__main__':

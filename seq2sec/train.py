@@ -14,7 +14,10 @@ def loss_mse(input, target):
     # some positions at label has 'value' NaN. isfinite() creates a mask to remove these positions
     # to correct loss calculation 
     mask = torch.isfinite(target)
-    return torch.nn.functional.mse_loss(torch.masked_select(input, mask), torch.masked_select(target, mask), reduction='mean') 
+    input = torch.masked_select(torch.squeeze(input), mask)
+    target = torch.masked_select(target, mask)
+    # print("After mask: input {} target {}".format(input.shape, target.shape))
+    return torch.nn.functional.mse_loss(input, target, reduction='mean') 
 
 
 # def train(data_config_file, nni_params, fn_to_save_model=""):
@@ -34,14 +37,10 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=32, shuffle=True, num_workers=6)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=32, shuffle=False, num_workers=6)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=2)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=2)
 
-    # if torch.cuda.is_available():
-    #     device = torch.device('cuda')
-    # else:
-    #     device = torch.device('cpu')
-    net = create_model(tasks)
+    net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)
 
     # loss
@@ -62,15 +61,12 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
 
     # metrics
     validation_acc = {k:[] for k in tasks}
-    # validation_acc['total'] = []
     validation_balanced_acc = {k:[] for k in tasks}
-    # validation_balanced_acc['total'] = []
     validation_cm = {k:[] for k in tasks}
-    # validation_cm['total'] = []
-
+    validation_merror = {k:[] for k in tasks}
 
     # epochs
-    for e in range(1000):
+    for e in range(10):
     
         # restart dictionary that accumulates losses per batch
         batch_of_losses = {k:[] for k in training_losses}
@@ -85,7 +81,10 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
             # Compute and print loss.
             losses = []
             for t in tasks:
-                l = loss_fn(pred[t], sample[t].to(device))
+                if t == 'buriedI_abs':
+                    l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
+                else:
+                    l = loss_fn(pred[t], sample[t].to(device))
                 batch_of_losses[t].append(l.item())
                 losses.append(l)
 
@@ -109,6 +108,7 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
         batch_of_acc = {k:[] for k in validation_losses}
         batch_of_balanced_acc = {k:[] for k in validation_losses}
         batch_of_cm = {k:[] for k in validation_losses}
+        batch_of_merror = {k:[] for k in validation_losses}
 
         # validation loop
         net.eval()
@@ -117,26 +117,33 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
             # print(sample['seq_res'])
             pred = net(sample['seq_res'].to(device))
 
-            # Compute and print loss.
+            # Compute and print loss for this batch
             losses = []
             for t in tasks:
-                l = loss_fn(pred[t], sample[t].to(device))
+                if t == 'buriedI_abs':
+                    l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
+                    batch_of_merror[t].append(np.sqrt(l.item()*100))
+                else:
+                    l = loss_fn(pred[t], sample[t].to(device))
+                    # metrics
+                    mask = sample[t].ge(0)
+                    y_true = torch.masked_select(sample[t], mask).numpy()
+                    y_pred = torch.masked_select(pred[t].argmax(dim=1).to(torch.device('cpu')), mask).numpy()
+
+                    acc = accuracy_score(y_true, y_pred)
+                    batch_of_acc[t].append(acc)
+
+                    bacc = balanced_accuracy_score(y_true, y_pred)
+                    batch_of_balanced_acc[t].append(bacc)
+                    # print("epoch: {} batch: {} task: {} acc: {} b_acc: {}".format(e, i, t, acc, bacc))
+                    cm = confusion_matrix(y_true,y_pred)
+                    batch_of_cm[t].append(cm)
+                    # print(cm)
+
                 batch_of_losses[t].append(l.item())
                 losses.append(l)
 
-                mask = sample[t].ge(0)
-                y_true = torch.masked_select(sample[t], mask).numpy()
-                y_pred = torch.masked_select(pred[t].argmax(dim=1).to(torch.device('cpu')), mask).numpy()
 
-                acc = accuracy_score(y_true, y_pred)
-                batch_of_acc[t].append(acc)
-
-                bacc = balanced_accuracy_score(y_true, y_pred)
-                batch_of_balanced_acc[t].append(bacc)
-                # print("epoch: {} batch: {} task: {} acc: {} b_acc: {}".format(e, i, t, acc, bacc))
-                cm = confusion_matrix(y_true,y_pred)
-                batch_of_cm[t].append(cm)
-                # print(cm)
 
             # loss = loss_fn(y_pred, y)
             loss = sum(losses)
@@ -151,15 +158,20 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
 
         report = {'default': validation_losses['total'][-1]}
         for t in tasks:
-            validation_acc[t].append(np.mean(batch_of_acc[t]))
-            validation_balanced_acc[t].append(np.mean(batch_of_balanced_acc[t]))
-            print("-> task: {} acc: {} balanced_acc: {}".format(t, validation_acc[t][-1], validation_balanced_acc[t][-1]))
+            if t == 'buriedI_abs':
+                validation_merror[t].append(np.mean(batch_of_merror[t]))
+                print("-> task: {} error: +/-{:.2f} loss: {:.4f}".format(t, validation_merror[t][-1], validation_losses[t][-1]))
+            else:
+                validation_acc[t].append(np.mean(batch_of_acc[t]))
+                validation_balanced_acc[t].append(np.mean(batch_of_balanced_acc[t]))
+                print("-> task: {} acc: {:.4f} balanced_acc: {:.4f} loss: {:.4f}".format(t, validation_acc[t][-1], validation_balanced_acc[t][-1], validation_losses[t][-1]))
 
-            # report used by nni
-            report["training_losses."+t] = training_losses[t][-1]
-            report["validation_losses."+t] = validation_losses[t][-1]
-            report["validation_acc."+t] = validation_acc[t][-1]
-            report["validation_balance_acc."+t] = validation_balanced_acc[t][-1]
+
+        #     # report used by nni
+        #     report["training_losses."+t] = training_losses[t][-1]
+        #     report["validation_losses."+t] = validation_losses[t][-1]
+        #     report["validation_acc."+t] = validation_acc[t][-1]
+        #     report["validation_balance_acc."+t] = validation_balanced_acc[t][-1]
 
 
         # print(report)
@@ -192,6 +204,8 @@ def create_model(tasks):
             net_output[t] = 4
         elif t == 'ss_cons_8_label':
             net_output[t] = 8
+        elif t == 'buriedI_abs':
+            net_output[t] = 1
 
     """@nni.variable(nni.choice(5,9,13,17,21), name=nb)"""
     nb = 21
