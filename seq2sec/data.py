@@ -26,8 +26,8 @@ class AA(Enum):
     S = 16
     T = 17
     V = 18
-    Y = 19
-    W = 20
+    W = 19
+    Y = 20
     after = 21
 
 
