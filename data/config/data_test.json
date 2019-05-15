@@ -1,6 +1,6 @@
 {
-    "path":"/home/jgcarvalho/local_data/cnnss/processed_data/",
-    "label":["ss_cons_3_label","ss_cons_4_label","buriedI_abs"],
+    "path":"/home/jgcarvalho/data/processed_data/",
+    "label":["ss_cons_3_label","ss_cons_4_label"],
     "training":[
         {"id":"1a02","chain":"N"},
         {"id":"16pk","chain":"A"},

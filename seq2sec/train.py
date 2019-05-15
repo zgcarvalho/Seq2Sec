@@ -7,6 +7,7 @@ import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 import nni
 
+
 # DEFAULT_PORT = 8097
 # DEFAULT_HOSTNAME = "http://localhost"
 
@@ -21,7 +22,7 @@ def loss_mse(input, target):
 
 
 # def train(data_config_file, nni_params, fn_to_save_model=""):
-def train(data_config_file, fn_to_save_model="", device='cpu'):
+def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     device=torch.device(device)
     # viz = Visdom(port=DEFAULT_PORT, server=DEFAULT_HOSTNAME)
 
@@ -37,8 +38,8 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=2)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=2)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=4)
 
     net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)
@@ -66,7 +67,7 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
     validation_merror = {k:[] for k in tasks}
 
     # epochs
-    for e in range(10):
+    for e in range(epochs):
     
         # restart dictionary that accumulates losses per batch
         batch_of_losses = {k:[] for k in training_losses}
@@ -157,6 +158,7 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
         print("epoch: {} training_loss: {} validation_loss: {}".format(e, training_losses['total'][-1], validation_losses['total'][-1]))
 
         report = {'default': validation_losses['total'][-1]}
+        """@nni.report_intermediate_result(report)"""
         for t in tasks:
             if t == 'buriedI_abs':
                 validation_merror[t].append(np.mean(batch_of_merror[t]))
@@ -175,7 +177,7 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
 
 
         # print(report)
-        """@nni.report_intermediate_result(report)"""
+        
         # nni.report_intermediate_result(report)
         
 
@@ -195,23 +197,23 @@ def train(data_config_file, fn_to_save_model="", device='cpu'):
     if fn_to_save_model != "":
         torch.save(net, fn_to_save_model)
 
-def create_model(tasks):
-    net_output = {}
-    for t in tasks:
-        if t == 'ss_cons_3_label':
-            net_output[t] = 3
-        elif t == 'ss_cons_4_label':
-            net_output[t] = 4
-        elif t == 'ss_cons_8_label':
-            net_output[t] = 8
-        elif t == 'buriedI_abs':
-            net_output[t] = 1
+# def create_model(tasks):
+#     net_output = {}
+#     for t in tasks:
+#         if t == 'ss_cons_3_label':
+#             net_output[t] = 3
+#         elif t == 'ss_cons_4_label':
+#             net_output[t] = 4
+#         elif t == 'ss_cons_8_label':
+#             net_output[t] = 8
+#         elif t == 'buriedI_abs':
+#             net_output[t] = 1
 
-    """@nni.variable(nni.choice(5,9,13,17,21), name=nb)"""
-    nb = 21
-    """@nni.variable(nni.choice(12,16,20,24,28,32,40), name=ch)"""
-    ch = 24
-    return model.ResNet2(net_output, n_blocks=nb, chan_hidden=ch)
+#     """@nni.variable(nni.choice(5,9,13,17,21), name=nb)"""
+#     nb = 21
+#     """@nni.variable(nni.choice(12,16,20,24,28,32,40), name=ch)"""
+#     ch = 24
+#     return model.ResNet2(net_output, n_blocks=nb, chan_hidden=ch)
 
 # def visdom_plot(training_losses, validation_losses, validation_acc, validation_balanced_acc, validation_cm):
 #         xlen = np.arange(0,len(training_losses['total']))
