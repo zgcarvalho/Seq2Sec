@@ -118,18 +118,19 @@ class ResNet2(nn.Module):
         for block in self.block_layers:
             b_results.append(block(b_results[-1]))
         # applies each exit layer to the steps (b_results) calculated before 
-        # results = {k: [nn.functional.softmax(self.exit_layers[k](step), #TODO remove softmax from regression tasks
-        #     dim=1).detach().numpy() for step in b_results] for k in
+        # results = {k: [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results] for k in
         #     self.exit_layers}
         results = {}
         for k in self.exit_layers:
             results[k] = []
             if k == 'buriedI_abs':
-                for step in b_results:
-                    results[k].append(self.exit_layers[k](step).detach().numpy())
+                results[k] = [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results]
+                # for step in b_results:
+                #     results[k].append(self.exit_layers[k](step).detach().numpy())
             else:
-                for step in b_results:
-                    results[k].append(nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy())
+                results[k] = [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results]
+                # for step in b_results:
+                #     results[k].append(nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy())
         return results
 
     def to(self, *args, **kwargs):

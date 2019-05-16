@@ -6,7 +6,7 @@ from seq2sec import model
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
 import nni
-
+import itertools
 
 # DEFAULT_PORT = 8097
 # DEFAULT_HOSTNAME = "http://localhost"
@@ -19,6 +19,62 @@ def loss_mse(input, target):
     target = torch.masked_select(target, mask)
     # print("After mask: input {} target {}".format(input.shape, target.shape))
     return torch.nn.functional.mse_loss(input, target, reduction='mean') 
+
+def loss_smothl1(input, target):
+    # some positions at label has 'value' NaN. isfinite() creates a mask to remove these positions
+    # to correct loss calculation 
+    mask = torch.isfinite(target)
+    input = torch.masked_select(torch.squeeze(input), mask)
+    target = torch.masked_select(target, mask)
+    # print("After mask: input {} target {}".format(input.shape, target.shape))
+    return torch.nn.functional.smooth_l1_loss(input, target, reduction='mean') 
+
+# class CustomMultiLossLayer(nn.Module):
+#     def __init__(self, nb_outputs=2):      
+#         super(CustomMultiLossLayer, self).__init__()
+#         self.nb_outputs = nb_outputs
+#         #self.log_vars = nn.Parameter(torch.zeros(nb_outputs))
+#         self.log_vars1 = torch.nn.Parameter(torch.FloatTensor([0]))
+#         self.log_vars2 = torch.nn.Parameter(torch.FloatTensor([0]))
+#         self.mse = nn.MSELoss()
+#     def forward(self, ys_true1, ys_pred1,  ys_true2, ys_pred2):
+#         loss = torch.exp(-self.log_vars1) * self.mse(ys_pred1, ys_true1) + self.log_vars1 + torch.exp(-self.log_vars2) * self.mse(ys_pred2, ys_true2) + self.log_vars2
+#         #print (torch.exp((self.log_vars1.data)**0.5), torch.exp((self.log_vars2.data)**0.5), loss.item(),self.log_vars2.item())
+#         return loss,self.log_vars1,self.log_vars2
+
+class UncLoss(torch.nn.Module):
+    def __init__(self, n_tasks):
+        super(UncLoss, self).__init__()
+        self.n_tasks = n_tasks
+        self.log_vars1 = torch.nn.Parameter(torch.FloatTensor([0])) 
+        self.log_vars2 = torch.nn.Parameter(torch.FloatTensor([0]))
+        self.log_vars3 = torch.nn.Parameter(torch.FloatTensor([0]))
+        self.ce = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
+
+    def forward(self, ys_pred, ys_true):
+        loss = torch.exp(-self.log_vars1) * self.ce(ys_pred['ss_cons_3_label'], ys_true['ss_cons_3_label']) + self.log_vars1 
+        loss += torch.exp(-self.log_vars2) * self.ce(ys_pred['ss_cons_4_label'], ys_true['ss_cons_4_label']) + self.log_vars2
+        loss += torch.exp(-self.log_vars3) * self.loss_smothl1(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
+        # loss += 0.5 * torch.exp(-self.log_vars3) * self.loss_mse(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
+        return loss 
+
+    def loss_smothl1(self, input, target):
+        # some positions at label has 'value' NaN. isfinite() creates a mask to remove these positions
+        # to correct loss calculation 
+        mask = torch.isfinite(target)
+        input = torch.masked_select(torch.squeeze(input), mask)
+        target = torch.masked_select(target, mask)
+        # print("After mask: input {} target {}".format(input.shape, target.shape))
+        return torch.nn.functional.smooth_l1_loss(input, target, reduction='mean') 
+
+    def loss_mse(self,  input, target):
+        # some positions at label has 'value' NaN. isfinite() creates a mask to remove these positions
+        # to correct loss calculation 
+        mask = torch.isfinite(target)
+        input = torch.masked_select(torch.squeeze(input), mask)
+        target = torch.masked_select(target, mask)
+        # print("After mask: input {} target {}".format(input.shape, target.shape))
+        return torch.nn.functional.mse_loss(input, target, reduction='mean') 
 
 
 # def train(data_config_file, nni_params, fn_to_save_model=""):
@@ -38,20 +94,22 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=64, shuffle=True, num_workers=4)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=64, shuffle=False, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=4)
 
-    net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
+    net = model.ResNet2(tasks, n_blocks=12, chan_hidden=8)
     net = net.to(device)
 
     # loss
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
 
+    loss_mt = UncLoss(2)
+
     # optimizer
     """@nni.variable(nni.loguniform(0.0001, 0.01), name=lr)"""
     lr = 0.003
     # lr = nni_params["learning_rate"]
-    optimizer = torch.optim.Adam(net.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(itertools.chain(net.parameters(), loss_mt.parameters()), lr=lr)
 
     
     # training and validations losses, total and per tasks
@@ -79,19 +137,22 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
             # print(sample['seq_res'])
             pred = net(sample['seq_res'].to(device))
 
-            # Compute and print loss.
-            losses = []
-            for t in tasks:
-                if t == 'buriedI_abs':
-                    l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
-                else:
-                    l = loss_fn(pred[t], sample[t].to(device))
-                batch_of_losses[t].append(l.item())
-                losses.append(l)
+            # # Compute and print loss.
+            # losses = []
+            # for t in tasks:
+            #     if t == 'buriedI_abs':
+            #         # l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
+            #         l = loss_smothl1(pred[t], sample[t].to(device)) / 10 # 1/100 is the weigth to mse (buried area)  
+            #     else:
+            #         l = loss_fn(pred[t], sample[t].to(device))
+            #     batch_of_losses[t].append(l.item())
+            #     losses.append(l)
 
-            # loss = loss_fn(y_pred, y)
-            loss = sum(losses)
-            # print(e, i, loss.item()) # print loss every batch (debug)
+            # # loss = loss_fn(y_pred, y)
+            # loss = sum(losses)
+            # # print(e, i, loss.item()) # print loss every batch (debug)
+
+            loss = loss_mt(pred, sample)
 
             # backprop
             optimizer.zero_grad()
@@ -100,8 +161,9 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
 
             batch_of_losses['total'].append(loss.item())
         
-        for k in training_losses:
-            training_losses[k].append(np.mean(batch_of_losses[k]))
+        # for k in training_losses:
+        #     training_losses[k].append(np.mean(batch_of_losses[k]))
+        training_losses['total'].append(np.mean(batch_of_losses['total']))
         
         
         # restart dictionary that accumulates losses per batch
@@ -122,8 +184,10 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
             losses = []
             for t in tasks:
                 if t == 'buriedI_abs':
-                    l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
-                    batch_of_merror[t].append(np.sqrt(l.item()*100))
+                    # l = loss_mse(pred[t], sample[t].to(device)) / 100 # 1/100 is the weigth to mse (buried area)  
+                    # batch_of_merror[t].append(np.sqrt(l.item()*100))
+                    l = loss_smothl1(pred[t], sample[t].to(device)) /10  # 1/100 is the weigth to mse (buried area)  
+                    batch_of_merror[t].append(l.item()*10)
                 else:
                     l = loss_fn(pred[t], sample[t].to(device))
                     # metrics
@@ -149,12 +213,11 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
             # loss = loss_fn(y_pred, y)
             loss = sum(losses)
             # print(e, i, loss.item()) # print loss every batch_of_losses = []
-
+            # loss = loss_mt(pred, sample)
             batch_of_losses['total'].append(loss.item())
         
         for k in validation_losses:
             validation_losses[k].append(np.mean(batch_of_losses[k]))
-
         print("epoch: {} training_loss: {} validation_loss: {}".format(e, training_losses['total'][-1], validation_losses['total'][-1]))
 
         report = {'default': validation_losses['total'][-1]}
