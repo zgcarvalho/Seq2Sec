@@ -38,8 +38,8 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=4)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=64, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=64, shuffle=False, num_workers=4)
 
     net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)
