@@ -94,16 +94,17 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=4)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=64, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=64, shuffle=False, num_workers=4)
 
-    net = model.ResNet2(tasks, n_blocks=12, chan_hidden=8)
+    net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)
 
     # loss
     loss_fn = torch.nn.CrossEntropyLoss(ignore_index=-1, reduction='mean')
 
     loss_mt = UncLoss(2)
+    loss_mt = loss_mt.to(device)
 
     # optimizer
     """@nni.variable(nni.loguniform(0.0001, 0.01), name=lr)"""
@@ -135,7 +136,8 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
         for i, sample in enumerate(trainloader):
             # Forward pass: compute predicted y by passing x to the model.
             # print(sample['seq_res'])
-            pred = net(sample['seq_res'].to(device))
+            sample = {k: sample[k].to(device) for k in sample}
+            pred = net(sample['seq_res'])
 
             # # Compute and print loss.
             # losses = []
@@ -151,7 +153,6 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
             # # loss = loss_fn(y_pred, y)
             # loss = sum(losses)
             # # print(e, i, loss.item()) # print loss every batch (debug)
-
             loss = loss_mt(pred, sample)
 
             # backprop
