@@ -124,7 +124,7 @@ class ResNet2(nn.Module):
         for k in self.exit_layers:
             results[k] = []
             if k == 'buriedI_abs':
-                results[k] = [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results]
+                results[k] = [self.exit_layers[k](step).detach().numpy() for step in b_results]
                 # for step in b_results:
                 #     results[k].append(self.exit_layers[k](step).detach().numpy())
             else:

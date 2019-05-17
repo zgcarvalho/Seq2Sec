@@ -4,6 +4,29 @@ from sys import argv
 import numpy as np
 from seq2sec.model import load
 
+MAX_SAS = {
+    'A':131.700,
+    'C':172.000,
+    'D':166.900,
+    'E':193.600,
+    'F':244.100,
+    'G':103.600,
+    'H':213.700,
+    'I':206.200,
+    'K':228.300,
+    'L':209.700,
+    'M':226.300,
+    'N':169.500,
+    'P':165.000,
+    'Q':197.800,
+    'R':255.500,
+    'S':141.900,
+    'T':164.400,
+    'V':180.000,
+    'W':285.600,
+    'Y':252.000
+}
+
 
 class Protein(object):
 
@@ -83,6 +106,15 @@ class Protein(object):
         m = torch.zeros((1, INPUT_CODE, len(x) + 2 * PAD), requires_grad=False)
         m[0, idx, np.arange(len(x) + 2 * PAD)] = 1
         return m
+
+    def asa(self, k='relative'):
+
+        if 'buriedI_abs' in self.prediction:
+            acc = [max(0, MAX_SAS[self.seq[i]] - self.prediction['buriedI_abs'][i]) for i in range(len(self.seq))]
+
+
+        return acc
+
 
     def plot_probs(self):
         pass
