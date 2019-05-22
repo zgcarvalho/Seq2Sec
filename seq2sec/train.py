@@ -36,7 +36,7 @@ def loss_smothl1(input, target):
 #         #self.log_vars = nn.Parameter(torch.zeros(nb_outputs))
 #         self.log_vars1 = torch.nn.Parameter(torch.FloatTensor([0]))
 #         self.log_vars2 = torch.nn.Parameter(torch.FloatTensor([0]))
-#         self.mse = nn.MSELoss()
+#         self.mse = nn.MSELoss()=200)
 #     def forward(self, ys_true1, ys_pred1,  ys_true2, ys_pred2):
 #         loss = torch.exp(-self.log_vars1) * self.mse(ys_pred1, ys_true1) + self.log_vars1 + torch.exp(-self.log_vars2) * self.mse(ys_pred2, ys_true2) + self.log_vars2
 #         #print (torch.exp((self.log_vars1.data)**0.5), torch.exp((self.log_vars2.data)**0.5), loss.item(),self.log_vars2.item())
@@ -94,8 +94,8 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=64, shuffle=True, num_workers=4)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=64, shuffle=False, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=16, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=16, shuffle=False, num_workers=4)
 
     net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)

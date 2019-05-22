@@ -108,13 +108,9 @@ class Protein(object):
         return m
 
     def asa(self, k='relative'):
-
         if 'buriedI_abs' in self.prediction:
             acc = [max(0, MAX_SAS[self.seq[i]] - self.prediction['buriedI_abs'][i]) for i in range(len(self.seq))]
-
-
         return acc
-
 
     def plot_probs(self):
         pass

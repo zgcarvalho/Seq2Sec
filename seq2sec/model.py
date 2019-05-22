@@ -22,15 +22,15 @@ class BlockLayer(nn.Module):
         self.act_02 = nn.PReLU(chan_in)
         self.conv_02 = nn.Conv1d(chan_in, chan_out, 3, padding=1)
         """@nni.variable(nni.uniform(0.0, 0.9), name=p_drop)"""
-        p_drop = 0.01
-        self.dropout = nn.Dropout(p=p_drop)
+        p_drop = 0.3
+        self.dropout = nn.Dropout2d(p=p_drop)
 
     def forward(self, x):
         residual = x
         out = self.act_01(x)
         out = self.conv_01(out)
-        out = self.act_02(out)
         out = self.dropout(out)
+        out = self.act_02(out)
         out = self.conv_02(out)
         out += residual
         return out
