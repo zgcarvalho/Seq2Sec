@@ -118,21 +118,16 @@ class ResNet2(nn.Module):
         # the first block layer applied to [0]. [2] is the result of the second block layer to [1]...
         for block in self.block_layers:
             b_results.append(block(b_results[-1]))
-        # applies each exit layer to the steps (b_results) calculated before 
-        # results = {k: [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results] for k in
-        #     self.exit_layers}
+
         results = {}
         for k in self.exit_layers:
             results[k] = []
             if k == 'buriedI_abs':
                 results[k] = [self.exit_layers[k](step).detach().numpy() for step in b_results]
-                # for step in b_results:
-                #     results[k].append(self.exit_layers[k](step).detach().numpy())
             else:
                 results[k] = [nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy() for step in b_results]
-                # for step in b_results:
-                #     results[k].append(nn.functional.softmax(self.exit_layers[k](step), dim=1).detach().numpy())
         return results
+
 
     def to(self, *args, **kwargs):
         self = super().to(*args, **kwargs) 
