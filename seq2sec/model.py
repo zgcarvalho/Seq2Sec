@@ -29,10 +29,9 @@ class BlockLayer(nn.Module):
         residual = x
         out = self.act_01(x)
         out = self.conv_01(out)
-        
+        out = self.dropout(out)
         out = self.act_02(out)
         out = self.conv_02(out)
-        out = self.dropout(out)
         out += residual
         return out
 
