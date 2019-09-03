@@ -1,5 +1,5 @@
 {
-    "path":"/home/jgcarvalho/local_data/cnnss/processed_data/",
+    "path":"/home/jgcarvalho/data/cnnss/processed_data/",
     "label":["ss_cons_3_label","ss_cons_4_label", "buriedI_abs"],
     "training":[
         {"id":"1a02","chain":"N"},

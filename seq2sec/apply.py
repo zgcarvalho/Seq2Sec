@@ -38,9 +38,13 @@ class Protein(object):
         self.probabilities = {}
         self.steps = {}
 
-    def predict_with(self, model_func):
+        self.buried = []
+        self.ss3 = []
+        self.ss3_steps = []
+
+    def predict_with(self, model):
         # convert string to one hot encoding and add padding
-        pred = model_func(self._pad_input(self._seq2int(self.seq)))
+        pred = model.predict(self._pad_input(self._seq2int(self.seq)))
         for k in pred:
             if k == 'buriedI_abs':
                 self.prediction[k] = np.squeeze(pred[k][-1][:, :, PAD:-PAD])
@@ -49,12 +53,21 @@ class Protein(object):
                 self.probabilities[k] = np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD][(-1), :, :])
                 self.prediction[k] = self._prob2ss(self.probabilities[k])
                 self.steps[k] = np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD], axes=[1, 2, 0])
-        # self.probabilities = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD
-        #     :-PAD][(-1), :, :]) for k in pred}
-        # self.prediction = {k: self._prob2ss(self.probabilities[k]) for k in
-        #     self.probabilities}
-        # self.steps = {k: np.transpose(np.squeeze(pred[k])[:, :, PAD:-PAD],
-        #     axes=[1, 2, 0]) for k in pred}
+
+    def sample_with(self, model, n=20):
+        model.train()
+        samples = [model.predict(self._pad_input(self._seq2int(self.seq))) for i in range(n)]
+        self.buried = np.array([np.squeeze(s['buriedI_abs'][-1][:, :, PAD:-PAD]) for s in samples])
+        self.ss3 = np.array([np.transpose(np.squeeze(s['ss_cons_3_label'])[:, :, PAD:-PAD][(-1), :, :]) for s in samples])
+        self.ss3_steps = np.array([np.transpose(np.squeeze(s['ss_cons_3_label'])[:, :, PAD:-PAD], axes=[1, 2, 0]) for s in samples])
+
+    def sample2_with(self, model, n=20):
+        # model.train()
+        samples = [model.predict2(self._pad_input(self._seq2int(self.seq))) for i in range(n)]
+        self.buried = np.array([np.squeeze(s['buriedI_abs'][-1][:, :, PAD:-PAD]) for s in samples])
+        
+        self.ss3 = np.array([np.transpose(np.squeeze(s['ss_cons_3_label'])[:, :, PAD:-PAD][(-1), :, :]) for s in samples])
+        self.ss3_steps = np.array([np.transpose(np.squeeze(s['ss_cons_3_label'])[:, :, PAD:-PAD], axes=[1, 2, 0]) for s in samples])
 
     def plot_probs(self):
         pass
@@ -109,7 +122,10 @@ class Protein(object):
 
     def asa(self, k='relative'):
         if 'buriedI_abs' in self.prediction:
-            acc = [max(0, MAX_SAS[self.seq[i]] - self.prediction['buriedI_abs'][i]) for i in range(len(self.seq))]
+            if k == 'absolute':
+                acc = [max(0, MAX_SAS[self.seq[i]] - self.prediction['buriedI_abs'][i]) for i in range(len(self.seq))]
+            elif k == 'relative':
+                acc = [max(0, MAX_SAS[self.seq[i]] - self.prediction['buriedI_abs'][i])/MAX_SAS[self.seq[i]] for i in range(len(self.seq))]
         return acc
 
     def plot_probs(self):

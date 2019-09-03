@@ -1,5 +1,5 @@
-{    "label": ["ss_cons_3_label", "ss_cons_4_label", "buriedI_abs"],
-    "path": "/home/jgcarvalho/data/processed_data/",    
+{   "path": "/tmp/processed_data/",   
+    "label":["ss_cons_3_label","ss_cons_4_label", "buriedI_abs"], 
     "testing": [
         {            "chain": "A",            "id": "189l"        },
         {            "chain": "A",            "id": "192l"        },

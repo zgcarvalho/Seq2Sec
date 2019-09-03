@@ -5,7 +5,7 @@ from seq2sec import model
 # from visdom import Visdom
 import numpy as np
 from sklearn.metrics import accuracy_score, balanced_accuracy_score, confusion_matrix
-import nni
+# import nni
 import itertools
 
 # DEFAULT_PORT = 8097
@@ -55,6 +55,7 @@ class UncLoss(torch.nn.Module):
         loss = torch.exp(-self.log_vars1) * self.ce(ys_pred['ss_cons_3_label'], ys_true['ss_cons_3_label']) + self.log_vars1 
         loss += torch.exp(-self.log_vars2) * self.ce(ys_pred['ss_cons_4_label'], ys_true['ss_cons_4_label']) + self.log_vars2
         loss += torch.exp(-self.log_vars3) * self.loss_smothl1(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
+        
         # loss += 0.5 * torch.exp(-self.log_vars3) * self.loss_mse(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
         return loss 
 
@@ -94,8 +95,8 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
     tasks = trainset.tasks
 
     # dataloaders
-    trainloader = torch.utils.data.DataLoader(trainset,batch_size=64, shuffle=True, num_workers=4)
-    valloader = torch.utils.data.DataLoader(valset,batch_size=64, shuffle=False, num_workers=4)
+    trainloader = torch.utils.data.DataLoader(trainset,batch_size=24, shuffle=True, num_workers=4)
+    valloader = torch.utils.data.DataLoader(valset,batch_size=24, shuffle=False, num_workers=4)
 
     net = model.ResNet2(tasks, n_blocks=21, chan_hidden=24)
     net = net.to(device)
@@ -108,7 +109,7 @@ def train(data_config_file, fn_to_save_model="", device='cpu', epochs=1000):
 
     # optimizer
     """@nni.variable(nni.loguniform(0.0001, 0.01), name=lr)"""
-    lr = 0.003
+    lr = 0.001
     # lr = nni_params["learning_rate"]
     optimizer = torch.optim.Adam(itertools.chain(net.parameters(), loss_mt.parameters()), lr=lr)
 
