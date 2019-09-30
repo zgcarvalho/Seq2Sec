@@ -54,7 +54,7 @@ class UncLoss(torch.nn.Module):
     def forward(self, ys_pred, ys_true):
         loss = torch.exp(-self.log_vars1) * self.ce(ys_pred['ss_cons_3_label'], ys_true['ss_cons_3_label']) + self.log_vars1 
         loss += torch.exp(-self.log_vars2) * self.ce(ys_pred['ss_cons_4_label'], ys_true['ss_cons_4_label']) + self.log_vars2
-        loss += torch.exp(-self.log_vars3) * self.loss_smothl1(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
+        loss += torch.exp(-self.log_vars3) * self.loss_mse(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
         
         # loss += 0.5 * torch.exp(-self.log_vars3) * self.loss_mse(ys_pred['buriedI_abs'], ys_true['buriedI_abs']) + self.log_vars3 
         return loss 

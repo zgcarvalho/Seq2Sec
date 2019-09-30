@@ -68,7 +68,7 @@ class InceptionBlockLayer(nn.Module):
         out_c = self.maxpool_01c(out)
         out_c = self.conv_02c(out_c)
         out_c = self.act(out_c)
-        out = residual + out_a + out_b #+ out_c
+        out = residual + out_a + out_b + out_c
         return out
 
 
